@@ -13,7 +13,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         </Link>
         <div className="flex items-center gap-6">
           <Link href="/pricing" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-            Pricing
+            Services & Pricing
           </Link>
           <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
             Sign in
@@ -39,7 +39,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <span className="text-sm font-semibold text-gray-900">Orion</span>
           </div>
           <p className="text-xs text-gray-400">
-            © 2024 Orion. Not a law firm. Legal guidance, not legal advice.
+            © 2025 Orion. Legal platform for startups. UK · US · Nigeria.
           </p>
         </div>
       </footer>

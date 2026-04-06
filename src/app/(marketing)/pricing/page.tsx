@@ -7,10 +7,11 @@ export default function PricingPage() {
     <div className="max-w-7xl mx-auto px-6 py-20">
       <div className="text-center mb-14">
         <h1 className="text-4xl font-bold text-gray-900 tracking-tight mb-4">
-          Simple, flat-fee pricing
+          Three packages, built for your stage
         </h1>
         <p className="text-gray-500 max-w-lg mx-auto">
-          No hourly rates. No surprise invoices. Pay once, get it done right.
+          From setting up your company to closing your first round — flat-fee pricing with no
+          hourly surprises. Pick the package that fits where you are.
         </p>
       </div>
 
@@ -64,12 +65,15 @@ export default function PricingPage() {
       </div>
 
       {/* FAQ teaser */}
-      <div className="text-center mt-14">
+      <div className="text-center mt-14 space-y-2">
         <p className="text-gray-500 text-sm">
-          Have questions?{" "}
+          Not sure which package is right for you?{" "}
           <a href="#" className="text-indigo-600 font-medium hover:underline">
             Talk to our team
           </a>
+        </p>
+        <p className="text-xs text-gray-400">
+          We support founders in the UK, US, Nigeria, and Free Zones.
         </p>
       </div>
     </div>
