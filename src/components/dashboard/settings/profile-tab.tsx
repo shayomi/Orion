@@ -1,6 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { mockUser } from "@/lib/mock-data";
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n.charAt(0))
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
 
 function InputField({
   label,
@@ -30,7 +38,11 @@ function InputField({
   );
 }
 
-export default function ProfileTab() {
+interface ProfileTabProps {
+  user: { name: string; email: string };
+}
+
+export default function ProfileTab({ user }: ProfileTabProps) {
   return (
     <Card className="max-w-xl">
       <CardHeader>
@@ -41,20 +53,20 @@ export default function ProfileTab() {
           <div className="flex items-center gap-4 pb-4 border-b border-gray-100">
             <div className="w-14 h-14 rounded-full bg-indigo-600 flex items-center justify-center">
               <span className="text-white text-xl font-semibold">
-                {mockUser.name.charAt(0)}
+                {getInitials(user.name)}
               </span>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-900">{mockUser.name}</p>
+              <p className="text-sm font-medium text-gray-900">{user.name}</p>
               <button className="text-xs text-indigo-600 hover:underline mt-0.5">
                 Change avatar
               </button>
             </div>
           </div>
-          <InputField label="Full Name" value={mockUser.name} />
+          <InputField label="Full Name" value={user.name} />
           <InputField
             label="Email Address"
-            value={mockUser.email}
+            value={user.email}
             readOnly
             hint="Contact support to change your email address"
           />

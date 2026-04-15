@@ -18,10 +18,10 @@ export default function HeroSection() {
       </p>
       <div className="flex items-center justify-center gap-3">
         <Link
-          href="/signup"
+          href="/health-check"
           className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl font-medium text-sm hover:bg-indigo-700 transition-colors shadow-sm"
         >
-          Get started <ArrowRight className="w-4 h-4" />
+          Free Legal Health Check <ArrowRight className="w-4 h-4" />
         </Link>
         <Link
           href="/pricing"
@@ -31,7 +31,7 @@ export default function HeroSection() {
         </Link>
       </div>
       <p className="text-xs text-gray-400 mt-4">
-        No hourly billing · Flat-fee packages · UK, US &amp; Nigeria
+        No signup required · 5 minutes · Instant results
       </p>
     </section>
   );

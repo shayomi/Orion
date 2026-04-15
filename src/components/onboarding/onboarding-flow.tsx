@@ -1,218 +1,517 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, ArrowRight, ArrowLeft } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
+  stageOptions,
+  jurisdictionOptions,
+  cofounderOptions,
+  employeeOptions,
+  industryOptions,
+  getRelevantDocuments,
+} from "@/lib/health-check/questions";
+import type { ProfileData } from "@/lib/health-check/types";
+import { persistHealthCheck } from "@/app/actions/health-check";
+import {
+  Building2,
+  FileText,
+  Sparkles,
+  CheckCircle2,
+  ChevronRight,
+  ChevronLeft,
+  Loader2,
+  ArrowRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const steps = [
-  { id: 1, title: "What are you building?" },
-  { id: 2, title: "Where are you incorporating?" },
-  { id: 3, title: "What's your funding status?" },
-  { id: 4, title: "Tell us about your team" },
-];
-
-const categories = [
-  "SaaS", "Marketplace", "Fintech", "Healthcare",
-  "E-commerce", "AI/ML", "Consumer", "Deep Tech",
-];
-
-const jurisdictions = [
-  "United Kingdom", "Delaware, USA", "Wyoming, USA",
-  "Nigeria", "Lagos Free Zone", "Cayman Islands", "Singapore", "Other",
-];
-
-const fundingStages = [
-  { value: "bootstrapped", label: "Bootstrapped", desc: "Self-funded, no external investment" },
-  { value: "raising", label: "Raising pre-seed", desc: "Actively looking for first check" },
-  { value: "pre_seed", label: "Pre-seed raised", desc: "Have some funding, building MVP" },
-  { value: "seed", label: "Seed raised", desc: "Have seed funding, scaling" },
-];
+function OptionButton({
+  selected,
+  label,
+  onClick,
+}: {
+  selected: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-all ${
+        selected
+          ? "border-indigo-500 bg-indigo-50 text-indigo-700 font-medium"
+          : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
 
 export default function OnboardingFlow() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [selected, setSelected] = useState<Record<number, string | number>>({});
+  const [step, setStep] = useState<"profile" | "documents" | "analysing">(
+    "profile"
+  );
   const [companyName, setCompanyName] = useState("");
-  const [teamSize, setTeamSize] = useState(2);
+  const [profile, setProfile] = useState<Partial<ProfileData>>({
+    hasRevenue: false,
+    raisingFunding: false,
+  });
+  const [documentsHeld, setDocumentsHeld] = useState<Set<string>>(new Set());
+  const [error, setError] = useState("");
 
-  const next = () => {
-    if (step < 4) setStep(step + 1);
-    else router.push("/dashboard");
+  const profileComplete =
+    companyName.trim() &&
+    profile.stage &&
+    profile.jurisdiction &&
+    profile.cofounders &&
+    profile.employees &&
+    profile.industry;
+
+  const handleProfileChange = (updates: Partial<ProfileData>) => {
+    setProfile((prev) => ({ ...prev, ...updates }));
   };
-  const back = () => setStep(step - 1);
+
+  const handleDocToggle = (docId: string) => {
+    setDocumentsHeld((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) next.delete(docId);
+      else next.add(docId);
+      return next;
+    });
+  };
+
+  const handleSubmit = async () => {
+    setStep("analysing");
+    setError("");
+
+    try {
+      // 1. Run AI health check assessment
+      const res = await fetch("/api/health-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile: profile as ProfileData,
+          documentsHeld: Array.from(documentsHeld),
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Assessment failed");
+      }
+
+      const result = await res.json();
+
+      // 2. Persist to database (user is already authenticated at this point)
+      const persistResult = await persistHealthCheck(JSON.stringify(result));
+
+      if (persistResult.error) {
+        throw new Error(persistResult.error);
+      }
+
+      // 3. Also save the company name to the startup
+      await fetch("/api/onboarding/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyName: companyName.trim(),
+          startupId: persistResult.startupId,
+        }),
+      });
+
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setStep("documents");
+    }
+  };
+
+  const currentStep = step === "profile" ? 1 : 2;
+  const progressPercent = step === "analysing" ? 100 : (currentStep / 2) * 100;
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center px-6 py-12">
-      {/* Logo */}
-      <div className="flex items-center gap-2 mb-10">
-        <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
-          <span className="text-white text-sm font-bold">O</span>
-        </div>
-        <span className="text-base font-semibold text-gray-900 tracking-tight">Orion</span>
-      </div>
-
-      {/* Stepper */}
-      <div className="flex items-center gap-2 mb-10">
-        {steps.map((s) => (
-          <div key={s.id} className="flex items-center gap-2">
-            <div
-              className={cn(
-                "w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors",
-                s.id < step
-                  ? "bg-indigo-600 text-white"
-                  : s.id === step
-                  ? "bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300"
-                  : "bg-gray-100 text-gray-400"
-              )}
-            >
-              {s.id < step ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.id}
+    <div className="min-h-screen bg-[#fafafa]">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-100">
+        <div className="max-w-2xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xs">O</span>
+              </div>
+              <span className="text-sm font-semibold text-gray-900">
+                Set up your account
+              </span>
             </div>
-            {s.id < 4 && (
-              <div className={`w-12 h-px ${s.id < step ? "bg-indigo-400" : "bg-gray-200"}`} />
-            )}
+            <Badge
+              variant={step === "profile" ? "info" : "outline"}
+            >
+              {step === "profile"
+                ? "1. Your startup"
+                : step === "documents"
+                  ? "2. Your documents"
+                  : "Analysing"}
+            </Badge>
           </div>
-        ))}
+          <Progress value={progressPercent} />
+        </div>
       </div>
 
-      {/* Card */}
-      <div className="w-full max-w-lg bg-white border border-gray-100 rounded-2xl shadow-sm p-8">
-        <div className="mb-6">
-          <p className="text-xs text-gray-400 font-medium mb-1">
-            Step {step} of {steps.length}
+      {/* Analysing state */}
+      {step === "analysing" && (
+        <div className="max-w-2xl mx-auto px-6 py-24 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-50 mb-6">
+            <Sparkles className="w-8 h-8 text-indigo-600 animate-pulse" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Preparing your legal health report...
+          </h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Our AI legal team is analysing your profile and documents across 10
+            legal domains to generate your personalised dashboard.
           </p>
-          <h2 className="text-xl font-semibold text-gray-900">{steps[step - 1].title}</h2>
+          <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            This usually takes 15-30 seconds
+          </div>
         </div>
+      )}
 
-        {step === 1 && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                Company name
-              </label>
-              <input
-                type="text"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="e.g. Acme Ltd"
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-2">Category</label>
-              <div className="grid grid-cols-4 gap-2">
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelected({ ...selected, 1: cat })}
-                    className={cn(
-                      "px-3 py-2 rounded-lg text-xs font-medium border transition-colors",
-                      selected[1] === cat
-                        ? "bg-indigo-600 text-white border-indigo-600"
-                        : "border-gray-200 text-gray-600 hover:border-indigo-300 hover:text-indigo-700"
-                    )}
-                  >
-                    {cat}
-                  </button>
-                ))}
+      {/* Profile step */}
+      {step === "profile" && (
+        <div className="max-w-2xl mx-auto px-6 pb-32">
+          <Card className="mt-6">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Tell us about your startup
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    This helps us tailor your legal health assessment
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                {/* Company name */}
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-2">
+                    Company name
+                  </p>
+                  <input
+                    type="text"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="e.g. Acme Inc"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50"
+                  />
+                </div>
+
+                {/* Stage */}
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-2">
+                    What stage is your startup?
+                  </p>
+                  <div className="space-y-2">
+                    {stageOptions.map((opt) => (
+                      <OptionButton
+                        key={opt.value}
+                        selected={profile.stage === opt.value}
+                        label={opt.label}
+                        onClick={() => handleProfileChange({ stage: opt.value })}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Jurisdiction */}
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-2">
+                    Where is your company based?
+                  </p>
+                  <div className="space-y-2">
+                    {jurisdictionOptions.map((opt) => (
+                      <OptionButton
+                        key={opt.value}
+                        selected={profile.jurisdiction === opt.value}
+                        label={opt.label}
+                        onClick={() =>
+                          handleProfileChange({ jurisdiction: opt.value })
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cofounders */}
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-2">
+                    How many co-founders?
+                  </p>
+                  <div className="space-y-2">
+                    {cofounderOptions.map((opt) => (
+                      <OptionButton
+                        key={opt.value}
+                        selected={profile.cofounders === opt.value}
+                        label={opt.label}
+                        onClick={() =>
+                          handleProfileChange({ cofounders: opt.value })
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Employees */}
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-2">
+                    Do you have employees or contractors?
+                  </p>
+                  <div className="space-y-2">
+                    {employeeOptions.map((opt) => (
+                      <OptionButton
+                        key={opt.value}
+                        selected={profile.employees === opt.value}
+                        label={opt.label}
+                        onClick={() =>
+                          handleProfileChange({ employees: opt.value })
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Industry */}
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-2">
+                    What industry?
+                  </p>
+                  <div className="space-y-2">
+                    {industryOptions.map((opt) => (
+                      <OptionButton
+                        key={opt.value}
+                        selected={profile.industry === opt.value}
+                        label={opt.label}
+                        onClick={() =>
+                          handleProfileChange({ industry: opt.value })
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick questions */}
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-2">
+                    Quick questions
+                  </p>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() =>
+                          handleProfileChange({ hasRevenue: !profile.hasRevenue })
+                        }
+                        className={cn(
+                          "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
+                          profile.hasRevenue
+                            ? "bg-indigo-600 border-indigo-600"
+                            : "border-gray-300"
+                        )}
+                      >
+                        {profile.hasRevenue && (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                        )}
+                      </button>
+                      <span className="text-sm text-gray-700">
+                        We have revenue
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() =>
+                          handleProfileChange({
+                            raisingFunding: !profile.raisingFunding,
+                          })
+                        }
+                        className={cn(
+                          "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
+                          profile.raisingFunding
+                            ? "bg-indigo-600 border-indigo-600"
+                            : "border-gray-300"
+                        )}
+                      >
+                        {profile.raisingFunding && (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                        )}
+                      </button>
+                      <span className="text-sm text-gray-700">
+                        We are currently raising / planning to raise funding
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          </Card>
 
-        {step === 2 && (
-          <div className="grid grid-cols-2 gap-2">
-            {jurisdictions.map((j) => (
-              <button
-                key={j}
-                onClick={() => setSelected({ ...selected, 2: j })}
-                className={cn(
-                  "px-4 py-3 rounded-lg text-sm font-medium border text-left transition-colors",
-                  selected[2] === j
-                    ? "bg-indigo-600 text-white border-indigo-600"
-                    : "border-gray-200 text-gray-700 hover:border-indigo-300"
-                )}
+          <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-100">
+            <div className="max-w-2xl mx-auto px-6 py-4 flex justify-end">
+              <Button
+                onClick={() => setStep("documents")}
+                disabled={!profileComplete}
               >
-                {j}
-              </button>
-            ))}
+                Next: Select your documents
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {step === 3 && (
-          <div className="space-y-3">
-            {fundingStages.map((fs) => (
-              <button
-                key={fs.value}
-                onClick={() => setSelected({ ...selected, 3: fs.value })}
-                className={cn(
-                  "w-full px-4 py-3.5 rounded-lg border text-left transition-colors",
-                  selected[3] === fs.value
-                    ? "bg-indigo-50 border-indigo-300"
-                    : "border-gray-200 hover:border-indigo-200"
-                )}
-              >
-                <p
-                  className={`text-sm font-semibold ${
-                    selected[3] === fs.value ? "text-indigo-700" : "text-gray-900"
-                  }`}
-                >
-                  {fs.label}
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">{fs.desc}</p>
-              </button>
-            ))}
-          </div>
-        )}
+      {/* Documents step */}
+      {step === "documents" && (
+        <DocumentsStep
+          profile={profile as ProfileData}
+          documentsHeld={documentsHeld}
+          onToggle={handleDocToggle}
+          onBack={() => setStep("profile")}
+          onSubmit={handleSubmit}
+          error={error}
+        />
+      )}
+    </div>
+  );
+}
 
-        {step === 4 && (
-          <div className="space-y-6">
+function DocumentsStep({
+  profile,
+  documentsHeld,
+  onToggle,
+  onBack,
+  onSubmit,
+  error,
+}: {
+  profile: ProfileData;
+  documentsHeld: Set<string>;
+  onToggle: (docId: string) => void;
+  onBack: () => void;
+  onSubmit: () => void;
+  error: string;
+}) {
+  const relevantDocs = useMemo(() => getRelevantDocuments(profile), [profile]);
+
+  const grouped = useMemo(() => {
+    const map: Record<string, typeof relevantDocs> = {};
+    for (const doc of relevantDocs) {
+      const domain = doc.domain.replace("_", " ");
+      if (!map[domain]) map[domain] = [];
+      map[domain].push(doc);
+    }
+    return Object.entries(map);
+  }, [relevantDocs]);
+
+  return (
+    <div className="max-w-2xl mx-auto px-6 pb-32">
+      <Card className="mt-6">
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+              <FileText className="w-5 h-5" />
+            </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-3">
-                Number of founders:{" "}
-                <span className="text-indigo-600 font-semibold">{teamSize}</span>
-              </label>
-              <input
-                type="range"
-                min={1}
-                max={10}
-                value={teamSize}
-                onChange={(e) => setTeamSize(Number(e.target.value))}
-                className="w-full accent-indigo-600"
-              />
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
-                <span>Solo founder</span>
-                <span>10+</span>
-              </div>
-            </div>
-            <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-              <p className="text-sm font-semibold text-indigo-900">
-                {teamSize > 1
-                  ? `With ${teamSize} founders, you'll need a co-founder agreement.`
-                  : "As a solo founder, we'll focus on IP protection and advisors."}
-              </p>
-              <p className="text-xs text-indigo-600 mt-1">
-                Orion will guide you through the right steps for your team structure.
+              <h2 className="text-lg font-semibold text-gray-900">
+                Which documents do you have?
+              </h2>
+              <p className="text-sm text-gray-500">
+                Based on your profile, these are relevant to your startup.
+                Showing {relevantDocs.length} documents.
               </p>
             </div>
           </div>
-        )}
 
-        {/* Navigation */}
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
-          {step > 1 ? (
-            <button
-              onClick={back}
-              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" /> Back
-            </button>
-          ) : (
-            <div />
+          <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg mb-6">
+            <p className="text-sm text-indigo-700">
+              <span className="font-medium">
+                Tick the documents you already have.
+              </span>{" "}
+              Don&apos;t worry if you&apos;re missing some — our AI will
+              identify the gaps and prioritise what matters.
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
           )}
-          <Button onClick={next}>
-            {step === 4 ? "Launch your dashboard" : "Continue"}
+
+          <div className="space-y-6">
+            {grouped.map(([domain, docs]) => (
+              <div key={domain}>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  {domain}
+                </p>
+                <div className="space-y-2">
+                  {docs.map((doc) => {
+                    const held = documentsHeld.has(doc.id);
+                    return (
+                      <button
+                        key={doc.id}
+                        onClick={() => onToggle(doc.id)}
+                        className={`w-full text-left p-3 rounded-lg border transition-all flex items-start gap-3 ${
+                          held
+                            ? "border-emerald-300 bg-emerald-50"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <div
+                          className={cn(
+                            "w-5 h-5 rounded border-2 flex items-center justify-center mt-0.5 shrink-0 transition-all",
+                            held
+                              ? "bg-emerald-600 border-emerald-600"
+                              : "border-gray-300"
+                          )}
+                        >
+                          {held && (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {doc.name}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {doc.description}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-100">
+        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
+          <Button variant="ghost" onClick={onBack}>
+            <ChevronLeft className="w-4 h-4" />
+            Back
+          </Button>
+          <Button onClick={onSubmit}>
+            <Sparkles className="w-4 h-4" />
+            Get my legal health score
             <ArrowRight className="w-4 h-4" />
           </Button>
         </div>

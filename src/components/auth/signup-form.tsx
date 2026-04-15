@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
+import { signUp, signInWithGoogle } from "@/app/actions/auth";
 
 function GoogleIcon() {
   return (
@@ -16,7 +17,12 @@ function GoogleIcon() {
 }
 
 export default function SignupForm() {
-  const router = useRouter();
+  const [state, formAction, pending] = useActionState(
+    async (_prev: { error?: string } | undefined, formData: FormData) => {
+      return await signUp(formData);
+    },
+    undefined
+  );
 
   return (
     <div className="w-full max-w-sm">
@@ -33,10 +39,15 @@ export default function SignupForm() {
           <p className="text-sm text-gray-500 mt-1">Start your legal journey with Orion</p>
         </div>
 
-        <button className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors mb-5">
-          <GoogleIcon />
-          Continue with Google
-        </button>
+        <form action={signInWithGoogle}>
+          <button
+            type="submit"
+            className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors mb-5"
+          >
+            <GoogleIcon />
+            Continue with Google
+          </button>
+        </form>
 
         <div className="flex items-center gap-3 mb-5">
           <div className="flex-1 h-px bg-gray-100" />
@@ -44,11 +55,13 @@ export default function SignupForm() {
           <div className="flex-1 h-px bg-gray-100" />
         </div>
 
-        <div className="space-y-4">
+        <form action={formAction} className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">Full name</label>
             <input
+              name="name"
               type="text"
+              required
               className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50"
               placeholder="Alex Johnson"
             />
@@ -58,7 +71,9 @@ export default function SignupForm() {
               Email address
             </label>
             <input
+              name="email"
               type="email"
+              required
               className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50"
               placeholder="you@startup.com"
             />
@@ -66,15 +81,25 @@ export default function SignupForm() {
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">Password</label>
             <input
+              name="password"
               type="password"
+              required
+              minLength={8}
               className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50"
               placeholder="Min 8 characters"
             />
           </div>
-          <Button onClick={() => router.push("/onboarding")} className="w-full" size="md">
-            Create Account
+
+          {state?.error && (
+            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+              {state.error}
+            </p>
+          )}
+
+          <Button type="submit" disabled={pending} className="w-full" size="md">
+            {pending ? "Creating account..." : "Create Account"}
           </Button>
-        </div>
+        </form>
 
         <p className="text-xs text-gray-400 text-center mt-4">
           By signing up, you agree to our{" "}

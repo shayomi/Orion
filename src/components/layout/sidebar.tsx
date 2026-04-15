@@ -10,20 +10,44 @@ import {
   Package,
   Settings,
   Building2,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { mockOrganization, mockUser } from "@/lib/mock-data";
 
 const navItems = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { label: "AI Assistant", href: "/dashboard/ai", icon: Sparkles },
   { label: "Workflows", href: "/dashboard/workflows", icon: GitBranch },
   { label: "Documents", href: "/dashboard/documents", icon: FileText },
+  { label: "Expert Help", href: "/dashboard/referrals", icon: Users },
   { label: "Services", href: "/dashboard/services", icon: Package },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  user: { name: string; email: string };
+  startup: { name: string; stage: string | null } | null;
+}
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n.charAt(0))
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+const stageLabels: Record<string, string> = {
+  idea: "Idea stage",
+  pre_seed: "Pre-seed",
+  seed: "Seed",
+  series_a: "Series A",
+  series_b: "Series B",
+  growth: "Growth",
+};
+
+export function Sidebar({ user, startup }: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -40,15 +64,22 @@ export function Sidebar() {
 
       {/* Org badge */}
       <div className="px-3 py-3 border-b border-gray-100">
-        <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg bg-gray-50">
+        <Link
+          href="/dashboard/settings"
+          className="flex items-center gap-2.5 px-2 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+        >
           <div className="w-6 h-6 bg-indigo-100 rounded flex items-center justify-center flex-shrink-0">
             <Building2 className="w-3.5 h-3.5 text-indigo-600" />
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-medium text-gray-900 truncate">{mockOrganization.name}</p>
-            <p className="text-xs text-gray-400 truncate">{mockOrganization.stage}</p>
+            <p className="text-xs font-medium text-gray-900 truncate">
+              {startup?.name || "My Startup"}
+            </p>
+            <p className="text-xs text-gray-400 truncate">
+              {startup?.stage ? stageLabels[startup.stage] || startup.stage : "Startup"}
+            </p>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Nav */}
@@ -84,17 +115,20 @@ export function Sidebar() {
 
       {/* User */}
       <div className="px-3 py-3 border-t border-gray-100">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+        <Link
+          href="/dashboard/settings"
+          className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+        >
           <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xs font-semibold">
-              {mockUser.name.charAt(0)}
+              {getInitials(user.name)}
             </span>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-gray-900 truncate">{mockUser.name}</p>
-            <p className="text-xs text-gray-400 truncate">{mockUser.email}</p>
+            <p className="text-xs font-medium text-gray-900 truncate">{user.name}</p>
+            <p className="text-xs text-gray-400 truncate">{user.email}</p>
           </div>
-        </div>
+        </Link>
       </div>
     </aside>
   );

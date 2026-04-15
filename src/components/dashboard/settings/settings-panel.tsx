@@ -8,7 +8,17 @@ import NotificationsTab from "./notifications-tab";
 
 const tabs = ["Profile", "Organization", "Billing", "Notifications"];
 
-export default function SettingsPanel() {
+interface SettingsPanelProps {
+  user: { name: string; email: string };
+  startup: {
+    name: string;
+    stage: string | null;
+    structure: string | null;
+    primaryJurisdiction: string | null;
+  } | null;
+}
+
+export default function SettingsPanel({ user, startup }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState("Profile");
 
   return (
@@ -29,8 +39,8 @@ export default function SettingsPanel() {
         ))}
       </div>
 
-      {activeTab === "Profile" && <ProfileTab />}
-      {activeTab === "Organization" && <OrganizationTab />}
+      {activeTab === "Profile" && <ProfileTab user={user} />}
+      {activeTab === "Organization" && <OrganizationTab startup={startup} />}
       {activeTab === "Billing" && <BillingTab />}
       {activeTab === "Notifications" && <NotificationsTab />}
     </div>

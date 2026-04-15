@@ -12,6 +12,9 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           <span className="text-base font-semibold text-gray-900 tracking-tight">Orion</span>
         </Link>
         <div className="flex items-center gap-6">
+          <Link href="/health-check" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+            Legal Health Check
+          </Link>
           <Link href="/pricing" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
             Services & Pricing
           </Link>

@@ -1,55 +1,68 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { GitBranch, FileText, Clock, TrendingUp } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { FileText, AlertTriangle, TrendingUp, Shield } from "lucide-react";
 
-type StatCard = {
-  label: string;
-  value: string;
-  sub: string;
-  icon: LucideIcon;
-  color: string;
-  bg: string;
-};
+interface StatsGridProps {
+  documentCount: number;
+  issueCount: number;
+  criticalCount: number;
+  riskScore: number | null;
+}
 
-const statCards: StatCard[] = [
-  {
-    label: "Active Workflows",
-    value: "1",
-    sub: "1 in progress",
-    icon: GitBranch,
-    color: "text-indigo-600",
-    bg: "bg-indigo-50",
-  },
-  {
-    label: "Documents",
-    value: "5",
-    sub: "2 drafts pending",
-    icon: FileText,
-    color: "text-emerald-600",
-    bg: "bg-emerald-50",
-  },
-  {
-    label: "Pending Actions",
-    value: "2",
-    sub: "Requires attention",
-    icon: Clock,
-    color: "text-amber-600",
-    bg: "bg-amber-50",
-  },
-  {
-    label: "Legal Health",
-    value: "72",
-    sub: "Good — room to improve",
-    icon: TrendingUp,
-    color: "text-indigo-600",
-    bg: "bg-indigo-50",
-  },
-];
+export default function StatsGrid({
+  documentCount,
+  issueCount,
+  criticalCount,
+  riskScore,
+}: StatsGridProps) {
+  const scoreLabel =
+    riskScore === null
+      ? "Not assessed"
+      : riskScore >= 80
+        ? "Strong"
+        : riskScore >= 60
+          ? "Good — room to improve"
+          : riskScore >= 40
+            ? "Needs attention"
+            : "At risk";
 
-export default function StatsGrid() {
+  const stats = [
+    {
+      label: "Documents",
+      value: String(documentCount),
+      sub: documentCount === 0 ? "Generate your first" : `${documentCount} generated`,
+      icon: FileText,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+    },
+    {
+      label: "Active Issues",
+      value: String(issueCount),
+      sub: issueCount === 0 ? "All clear" : `${criticalCount} critical/high`,
+      icon: AlertTriangle,
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+    },
+    {
+      label: "Critical Actions",
+      value: String(criticalCount),
+      sub: criticalCount === 0 ? "No urgent items" : "Requires attention",
+      icon: Shield,
+      color: "text-red-600",
+      bg: "bg-red-50",
+    },
+    {
+      label: "Legal Health",
+      value: riskScore !== null ? String(riskScore) : "—",
+      sub: scoreLabel,
+      icon: TrendingUp,
+      color: "text-indigo-600",
+      bg: "bg-indigo-50",
+    },
+  ];
+
   return (
     <div className="grid grid-cols-4 gap-4">
-      {statCards.map((stat) => {
+      {stats.map((stat) => {
         const Icon = stat.icon;
         return (
           <Card key={stat.label}>
