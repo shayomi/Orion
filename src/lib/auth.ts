@@ -57,11 +57,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
       }
+
+       if (token.id && (user || !token.role || !token.status)) {
+        const [dbUser] = await db
+          .select({ role: users.role, status: users.status })
+          .from(users)
+          .where(eq(users.id, token.id as string))
+          .limit(1);
+
+        token.role = dbUser?.role ?? "member";
+        token.status = dbUser?.status ?? "active";
+      }
+
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.id) {
         session.user.id = token.id as string;
+        session.user.role = (token.role as "member" | "admin") ?? "member";
+        session.user.status = (token.status as "active" | "suspended") ?? "active";
       }
       return session;
     },
@@ -72,11 +86,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Protected routes
       const isAppRoute =
         pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding");
+      const isAdminCreate = pathname === "/admin/create";
+      const isAdminRoute = pathname.startsWith("/admin") && !isAdminCreate;
       const isAuthRoute =
         pathname.startsWith("/login") || pathname.startsWith("/signup");
+      const isActiveAdmin =
+        auth?.user?.role === "admin" && auth.user.status === "active";
 
       if (isAppRoute && !isLoggedIn) {
         return Response.redirect(new URL("/login", request.url));
+      }
+
+      // /admin/create is public (self-locking via page logic)
+      if (isAdminRoute && !isLoggedIn) {
+        return Response.redirect(new URL("/login", request.url));
+      }
+
+      if (isAdminRoute && !isActiveAdmin) {
+        return Response.redirect(new URL("/dashboard", request.url));
       }
 
       if (isAuthRoute && isLoggedIn) {

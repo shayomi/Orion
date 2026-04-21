@@ -6,7 +6,13 @@ import { users, startups, legalIssues, documents } from "@/lib/db/schema";
 import { eq, and, count, desc } from "drizzle-orm";
 
 export interface DashboardData {
-  user: { id: string; name: string; email: string };
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: "member" | "admin";
+    status: "active" | "suspended";
+  };
   startup: {
     id: string;
     name: string;
@@ -45,7 +51,13 @@ export async function getDashboardData(): Promise<DashboardData | null> {
 
   // Fetch user
   const [user] = await db
-    .select({ id: users.id, name: users.name, email: users.email })
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      status: users.status,
+    })
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
@@ -117,7 +129,13 @@ export async function getDashboardData(): Promise<DashboardData | null> {
   }
 
   return {
-    user: { id: user.id, name: user.name || "User", email: user.email },
+    user: {
+      id: user.id,
+      name: user.name || "User",
+      email: user.email,
+      role: user.role,
+      status: user.status,
+    },
     startup: startup || null,
     stats,
     issues,

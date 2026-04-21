@@ -58,12 +58,24 @@ export const referralStatusEnum = pgEnum("referral_status", [
   "cancelled",
 ]);
 
+export const userRoleEnum = pgEnum("user_role", ["member", "admin"]);
+
+export const userStatusEnum = pgEnum("user_status", ["active", "suspended"]);
+
+export const assessmentTemplateStatusEnum = pgEnum("assessment_template_status", [
+  "draft",
+  "published",
+  "archived",
+]);
+
 // ─── NextAuth Required Tables ────────────────────────────
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 255 }),
   email: varchar("email", { length: 255 }).notNull().unique(),
+  role: userRoleEnum("role").default("member").notNull(),
+  status: userStatusEnum("status").default("active").notNull(),
   emailVerified: timestamp("email_verified", { mode: "date" }),
   image: text("image"),
   passwordHash: text("password_hash"),
@@ -244,6 +256,69 @@ export const referrals = pgTable("referrals", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// ─── Assessment Builder Templates ───────────────────────
+
+export const assessmentTemplates = pgTable("assessment_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  status: assessmentTemplateStatusEnum("status").default("draft").notNull(),
+  version: integer("version").default(1).notNull(),
+  createdByUserId: uuid("created_by_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "restrict" }),
+  publishedAt: timestamp("published_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const assessmentTemplateSections = pgTable("assessment_template_sections", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  templateId: uuid("template_id")
+    .notNull()
+    .references(() => assessmentTemplates.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  orderIndex: integer("order_index").default(0).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const assessmentTemplateQuestions = pgTable("assessment_template_questions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  sectionId: uuid("section_id")
+    .notNull()
+    .references(() => assessmentTemplateSections.id, { onDelete: "cascade" }),
+  questionKey: varchar("question_key", { length: 255 }).notNull(),
+  prompt: text("prompt").notNull(),
+  description: text("description"),
+  inputType: varchar("input_type", { length: 50 }).default("text").notNull(),
+  options: jsonb("options"),
+  domain: varchar("domain", { length: 255 }),
+  required: boolean("required").default(true).notNull(),
+  weight: integer("weight").default(1).notNull(),
+  orderIndex: integer("order_index").default(0).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const assessmentTemplateRules = pgTable("assessment_template_rules", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  templateId: uuid("template_id")
+    .notNull()
+    .references(() => assessmentTemplates.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  condition: jsonb("condition").notNull(),
+  severity: severityEnum("severity").notNull(),
+  resolutionPath: resolutionPathEnum("resolution_path").notNull(),
+  recommendationTitle: varchar("recommendation_title", { length: 500 }).notNull(),
+  recommendationDescription: text("recommendation_description").notNull(),
+  priority: integer("priority").default(0).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // ─── Chat History (AI Conversations) ─────────────────────
 
 export const chatMessages = pgTable("chat_messages", {
@@ -302,6 +377,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   referrals: many(referrals),
   chatMessages: many(chatMessages),
   auditLogs: many(auditLog),
+  assessmentTemplates: many(assessmentTemplates),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
@@ -357,6 +433,43 @@ export const referralsRelations = relations(referrals, ({ one }) => ({
   issue: one(legalIssues, { fields: [referrals.issueId], references: [legalIssues.id] }),
   startup: one(startups, { fields: [referrals.startupId], references: [startups.id] }),
   user: one(users, { fields: [referrals.userId], references: [users.id] }),
+}));
+
+export const assessmentTemplatesRelations = relations(assessmentTemplates, ({ one, many }) => ({
+  createdByUser: one(users, {
+    fields: [assessmentTemplates.createdByUserId],
+    references: [users.id],
+  }),
+  sections: many(assessmentTemplateSections),
+  rules: many(assessmentTemplateRules),
+}));
+
+export const assessmentTemplateSectionsRelations = relations(
+  assessmentTemplateSections,
+  ({ one, many }) => ({
+    template: one(assessmentTemplates, {
+      fields: [assessmentTemplateSections.templateId],
+      references: [assessmentTemplates.id],
+    }),
+    questions: many(assessmentTemplateQuestions),
+  })
+);
+
+export const assessmentTemplateQuestionsRelations = relations(
+  assessmentTemplateQuestions,
+  ({ one }) => ({
+    section: one(assessmentTemplateSections, {
+      fields: [assessmentTemplateQuestions.sectionId],
+      references: [assessmentTemplateSections.id],
+    }),
+  })
+);
+
+export const assessmentTemplateRulesRelations = relations(assessmentTemplateRules, ({ one }) => ({
+  template: one(assessmentTemplates, {
+    fields: [assessmentTemplateRules.templateId],
+    references: [assessmentTemplates.id],
+  }),
 }));
 
 export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({

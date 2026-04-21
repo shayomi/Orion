@@ -1,24 +1,154 @@
-import { buildAssessmentPrompt } from "@/lib/health-check/scoring";
-import type { ProfileData, HealthCheckResult } from "@/lib/health-check/types";
+import { db } from "@/lib/db";
+import {
+  assessmentTemplates,
+  assessmentTemplateSections,
+  assessmentTemplateQuestions,
+} from "@/lib/db/schema";
+import { eq, inArray, asc } from "drizzle-orm";
 import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: Request) {
-  const { profile, documentsHeld } = (await req.json()) as {
-    profile: ProfileData;
-    documentsHeld: string[];
+  const { templateId, answers } = (await req.json()) as {
+    templateId: string;
+    answers: Record<string, string | string[]>;
   };
 
-  if (!profile?.stage || !profile?.jurisdiction) {
+  if (!templateId || !answers || Object.keys(answers).length === 0) {
     return Response.json(
-      { error: "Profile with stage and jurisdiction is required" },
+      { error: "templateId and answers are required" },
       { status: 400 }
     );
   }
 
-  // Rules engine builds the structured prompt
-  const prompt = buildAssessmentPrompt(profile, documentsHeld);
+  // Fetch template, sections, and questions from DB
+  const [template] = await db
+    .select()
+    .from(assessmentTemplates)
+    .where(eq(assessmentTemplates.id, templateId))
+    .limit(1);
+
+  if (!template) {
+    return Response.json({ error: "Template not found" }, { status: 404 });
+  }
+
+  const sections = await db
+    .select()
+    .from(assessmentTemplateSections)
+    .where(eq(assessmentTemplateSections.templateId, templateId))
+    .orderBy(asc(assessmentTemplateSections.orderIndex));
+
+  const sectionIds = sections.map((s) => s.id);
+  const questions = sectionIds.length
+    ? await db
+        .select()
+        .from(assessmentTemplateQuestions)
+        .where(inArray(assessmentTemplateQuestions.sectionId, sectionIds))
+        .orderBy(asc(assessmentTemplateQuestions.orderIndex))
+    : [];
+
+  // Build structured brief from answers
+  const sectionMap = new Map(sections.map((s) => [s.id, s]));
+  const questionsBySection = new Map<string, typeof questions>();
+  for (const q of questions) {
+    const list = questionsBySection.get(q.sectionId) ?? [];
+    list.push(q);
+    questionsBySection.set(q.sectionId, list);
+  }
+
+  let briefSections = "";
+  for (const section of sections) {
+    const sectionQuestions = questionsBySection.get(section.id) ?? [];
+    const answeredQuestions = sectionQuestions.filter((q) => {
+      const val = answers[q.questionKey];
+      if (Array.isArray(val)) return val.length > 0;
+      return !!val;
+    });
+
+    if (answeredQuestions.length === 0) continue;
+
+    briefSections += `\n═══════════════════════════════════════\n`;
+    briefSections += `${section.title.toUpperCase()}\n`;
+    briefSections += `═══════════════════════════════════════\n`;
+
+    for (const q of answeredQuestions) {
+      const val = answers[q.questionKey];
+      const displayVal = Array.isArray(val) ? val.join(", ") : val;
+      briefSections += `Q: ${q.prompt}\n`;
+      briefSections += `A: ${displayVal}\n\n`;
+    }
+  }
+
+  // Collect domains from answered questions
+  const answeredDomains = [
+    ...new Set(
+      questions
+        .filter((q) => {
+          const val = answers[q.questionKey];
+          if (Array.isArray(val)) return val.length > 0;
+          return !!val;
+        })
+        .map((q) => q.domain)
+        .filter(Boolean)
+    ),
+  ];
+
+  const prompt = `
+YOU ARE A SENIOR LEGAL ADVISORY TEAM WITH 50 YEARS OF COMBINED EXPERIENCE IN STARTUP LAW.
+
+You have been retained to perform a comprehensive legal health assessment for a startup. Below is the structured intake questionnaire completed by the founder. Analyse every answer carefully and deliver your assessment.
+
+${briefSections}
+
+═══════════════════════════════════════
+LEGAL DOMAINS COVERED
+═══════════════════════════════════════
+${answeredDomains.join(", ")}
+
+═══════════════════════════════════════
+YOUR ASSESSMENT INSTRUCTIONS
+═══════════════════════════════════════
+
+Deliver your response as valid JSON matching this exact structure:
+
+{
+  "overallScore": <number 0-100, higher = healthier>,
+  "riskLevel": "<critical|high|medium|low|info>",
+  "summary": "<2-3 sentence executive summary of the startup's legal health>",
+  "domainScores": {
+    "<domain>": { "score": <0-100>, "issues": <count> }
+  },
+  "issues": [
+    {
+      "id": "<unique_id>",
+      "domain": "<domain>",
+      "title": "<concise issue title>",
+      "description": "<2-3 sentence explanation of WHY this matters, written for a founder, not a lawyer>",
+      "severity": "<critical|high|medium|low|info>",
+      "resolutionPath": "<self_serve|document_generation|expert_referral>",
+      "recommendation": {
+        "title": "<action title>",
+        "description": "<specific, actionable next step>"
+      }
+    }
+  ],
+  "priorityActions": [
+    "<top 3-5 things this startup should do FIRST, in priority order>"
+  ]
+}
+
+ASSESSMENT RULES:
+1. Score based on the COMBINATION of all answers — identify gaps, missing documents, compliance issues, and structural risks.
+2. Identify issues BEYOND just what's explicitly stated — flag risks based on the startup's profile (e.g., "You're raising funding without a clean cap table" or "Your jurisdiction requires specific compliance").
+3. Severity must be honest — don't inflate to scare, don't downplay to comfort.
+4. resolutionPath: "document_generation" if we can generate the doc, "self_serve" if the founder can handle it, "expert_referral" if it needs a lawyer.
+5. Include ALL relevant domains in domainScores, even if score is 100.
+6. priorityActions should be ordered by urgency and impact.
+7. Write for founders — plain language, no jargon, explain why things matter.
+8. If an answer is "No" to a question about having a document or compliance item, that's a gap — assess accordingly.
+
+Return ONLY the JSON object. No markdown, no code fences, no commentary.`;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -26,7 +156,7 @@ export async function POST(req: Request) {
       {
         role: "system",
         content:
-          "You are a senior legal advisory AI embedded in a startup legal platform. You assess startup legal health based on structured briefs. You MUST respond with valid JSON only — no markdown, no code fences, no commentary before or after the JSON.",
+          "You are a senior legal advisory AI embedded in a startup legal platform. You assess startup legal health based on structured questionnaire responses. You MUST respond with valid JSON only — no markdown, no code fences, no commentary before or after the JSON.",
       },
       { role: "user", content: prompt },
     ],
@@ -42,11 +172,12 @@ export async function POST(req: Request) {
     );
   }
 
-  // Parse the AI response
-  let assessment: Omit<HealthCheckResult, "completedAt" | "profile" | "documentsHeld">;
+  let assessment;
   try {
-    // Strip any markdown fences the model might add despite instructions
-    const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const cleaned = raw
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
     assessment = JSON.parse(cleaned);
   } catch {
     return Response.json(
@@ -55,11 +186,12 @@ export async function POST(req: Request) {
     );
   }
 
-  const result: HealthCheckResult = {
+  const result = {
     ...assessment,
     completedAt: new Date().toISOString(),
-    profile,
-    documentsHeld,
+    templateId,
+    answeredQuestions: Object.keys(answers).length,
+    totalQuestions: questions.length,
   };
 
   return Response.json(result);
