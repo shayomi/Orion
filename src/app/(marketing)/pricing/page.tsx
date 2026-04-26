@@ -1,5 +1,5 @@
 import { CheckCircle2, ArrowRight } from "lucide-react";
-import { mockServices } from "@/lib/mock-data";
+import { SERVICES } from "@/lib/data/services";
 import Link from "next/link";
 
 export default function PricingPage() {
@@ -15,8 +15,8 @@ export default function PricingPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-6 max-w-5xl mx-auto">
-        {mockServices.map((service) => (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        {SERVICES.map((service) => (
           <div
             key={service.id}
             className={`relative bg-white rounded-2xl border p-8 ${

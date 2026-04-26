@@ -156,6 +156,9 @@ export const assessments = pgTable("assessments", {
   startupId: uuid("startup_id")
     .notNull()
     .references(() => startups.id, { onDelete: "cascade" }),
+  templateId: uuid("template_id").references(() => assessmentTemplates.id, {
+    onDelete: "set null",
+  }),
   status: assessmentStatusEnum("status").default("in_progress").notNull(),
   overallScore: integer("overall_score"),
   riskLevel: severityEnum("risk_level"),
@@ -174,6 +177,22 @@ export const assessmentResponses = pgTable("assessment_responses", {
   answer: jsonb("answer").notNull(), // flexible: string, array, object
   domain: varchar("domain", { length: 255 }), // e.g. "incorporation", "equity", "ip"
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// ─── Assessment Answers (raw answers + AI analysis side-by-side) ──
+
+export const assessmentAnswers = pgTable("assessment_answers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  assessmentId: uuid("assessment_id")
+    .notNull()
+    .references(() => assessments.id, { onDelete: "cascade" }),
+  rawAnswers: jsonb("raw_answers").notNull(),
+  aiAnalysis: jsonb("ai_analysis"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 // ─── Legal Issues ────────────────────────────────────────
@@ -345,6 +364,10 @@ export const uploads = pgTable("uploads", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  assessmentId: uuid("assessment_id").references(() => assessments.id, {
+    onDelete: "set null",
+  }),
+  questionKey: varchar("question_key", { length: 255 }),
   name: varchar("name", { length: 500 }).notNull(),
   storageKey: text("storage_key").notNull(),
   mimeType: varchar("mime_type", { length: 255 }).notNull(),
@@ -378,6 +401,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   chatMessages: many(chatMessages),
   auditLogs: many(auditLog),
   assessmentTemplates: many(assessmentTemplates),
+  assessmentAnswers: many(assessmentAnswers),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
@@ -405,12 +429,20 @@ export const entityStructuresRelations = relations(entityStructures, ({ one }) =
 
 export const assessmentsRelations = relations(assessments, ({ one, many }) => ({
   startup: one(startups, { fields: [assessments.startupId], references: [startups.id] }),
+  template: one(assessmentTemplates, { fields: [assessments.templateId], references: [assessmentTemplates.id] }),
   responses: many(assessmentResponses),
+  answers: many(assessmentAnswers),
   legalIssues: many(legalIssues),
+  uploads: many(uploads),
 }));
 
 export const assessmentResponsesRelations = relations(assessmentResponses, ({ one }) => ({
   assessment: one(assessments, { fields: [assessmentResponses.assessmentId], references: [assessments.id] }),
+}));
+
+export const assessmentAnswersRelations = relations(assessmentAnswers, ({ one }) => ({
+  user: one(users, { fields: [assessmentAnswers.userId], references: [users.id] }),
+  assessment: one(assessments, { fields: [assessmentAnswers.assessmentId], references: [assessments.id] }),
 }));
 
 export const legalIssuesRelations = relations(legalIssues, ({ one, many }) => ({
@@ -480,6 +512,7 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
 export const uploadsRelations = relations(uploads, ({ one }) => ({
   startup: one(startups, { fields: [uploads.startupId], references: [startups.id] }),
   user: one(users, { fields: [uploads.userId], references: [users.id] }),
+  assessment: one(assessments, { fields: [uploads.assessmentId], references: [assessments.id] }),
 }));
 
 export const auditLogRelations = relations(auditLog, ({ one }) => ({

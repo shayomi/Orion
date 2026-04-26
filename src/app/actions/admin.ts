@@ -6,11 +6,16 @@ import {
   assessmentTemplateRules,
   assessmentTemplateSections,
   assessmentTemplates,
+  assessments,
+  assessmentResponses,
+  startups,
+  uploads,
   auditLog,
   users,
 } from "@/lib/db/schema";
 import { requireActiveAdmin } from "@/lib/admin";
 import {
+  and,
   asc,
   desc,
   eq,
@@ -94,6 +99,31 @@ function revalidateAssessments(templateId?: string) {
   if (templateId) {
     revalidatePath(`/admin/assessments/${templateId}`);
   }
+}
+
+// ─── User stats (admin overview) ────────────────────────
+
+export async function getAdminUserStats() {
+  await requireActiveAdmin();
+
+  const rows = await db
+    .select({
+      role: users.role,
+      status: users.status,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(users)
+    .groupBy(users.role, users.status);
+
+  const stats = { total: 0, active: 0, suspended: 0, admins: 0, members: 0 };
+  for (const row of rows) {
+    stats.total += row.count;
+    if (row.status === "active") stats.active += row.count;
+    if (row.status === "suspended") stats.suspended += row.count;
+    if (row.role === "admin") stats.admins += row.count;
+    if (row.role === "member") stats.members += row.count;
+  }
+  return stats;
 }
 
 // ─── User list (paginated) ──────────────────────────────
@@ -1092,4 +1122,148 @@ export async function getRecentAdminAuditEvents(limit = 20) {
     .where(ilike(auditLog.action, "admin_%"))
     .orderBy(desc(auditLog.createdAt))
     .limit(limit);
+}
+
+// ─── Assessment Submissions (admin view) ───────────────
+
+export async function listAssessmentSubmissions(
+  templateId?: string,
+  page = 1
+) {
+  await requireActiveAdmin();
+
+  const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
+
+  const whereClause = templateId
+    ? eq(assessments.templateId, templateId)
+    : undefined;
+
+  const [countResult] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(assessments)
+    .where(whereClause);
+
+  const items = await db
+    .select({
+      id: assessments.id,
+      status: assessments.status,
+      overallScore: assessments.overallScore,
+      riskLevel: assessments.riskLevel,
+      completedAt: assessments.completedAt,
+      createdAt: assessments.createdAt,
+      startupName: startups.name,
+      startupId: startups.id,
+      userName: users.name,
+      userEmail: users.email,
+      templateName: assessmentTemplates.name,
+      templateId: assessmentTemplates.id,
+    })
+    .from(assessments)
+    .leftJoin(startups, eq(assessments.startupId, startups.id))
+    .leftJoin(users, eq(startups.userId, users.id))
+    .leftJoin(
+      assessmentTemplates,
+      eq(assessments.templateId, assessmentTemplates.id)
+    )
+    .where(whereClause)
+    .orderBy(desc(assessments.createdAt))
+    .limit(PAGE_SIZE)
+    .offset(offset);
+
+  const total = countResult.count;
+
+  return {
+    items,
+    total,
+    page,
+    perPage: PAGE_SIZE,
+    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+  };
+}
+
+export async function getAssessmentSubmissionDetail(assessmentId: string) {
+  await requireActiveAdmin();
+
+  // Get the assessment with related data
+  const [assessment] = await db
+    .select({
+      id: assessments.id,
+      status: assessments.status,
+      overallScore: assessments.overallScore,
+      riskLevel: assessments.riskLevel,
+      completedAt: assessments.completedAt,
+      createdAt: assessments.createdAt,
+      startupName: startups.name,
+      startupId: startups.id,
+      userName: users.name,
+      userEmail: users.email,
+      templateName: assessmentTemplates.name,
+      templateId: assessmentTemplates.id,
+    })
+    .from(assessments)
+    .leftJoin(startups, eq(assessments.startupId, startups.id))
+    .leftJoin(users, eq(startups.userId, users.id))
+    .leftJoin(
+      assessmentTemplates,
+      eq(assessments.templateId, assessmentTemplates.id)
+    )
+    .where(eq(assessments.id, assessmentId))
+    .limit(1);
+
+  if (!assessment) return null;
+
+  // Get all responses
+  const responses = await db
+    .select({
+      id: assessmentResponses.id,
+      questionId: assessmentResponses.questionId,
+      questionText: assessmentResponses.questionText,
+      answer: assessmentResponses.answer,
+      domain: assessmentResponses.domain,
+      createdAt: assessmentResponses.createdAt,
+    })
+    .from(assessmentResponses)
+    .where(eq(assessmentResponses.assessmentId, assessmentId))
+    .orderBy(asc(assessmentResponses.createdAt));
+
+  // Get all uploads linked to this assessment
+  const assessmentUploads = await db
+    .select({
+      id: uploads.id,
+      name: uploads.name,
+      storageKey: uploads.storageKey,
+      mimeType: uploads.mimeType,
+      fileSize: uploads.fileSize,
+      questionKey: uploads.questionKey,
+      domain: uploads.domain,
+      createdAt: uploads.createdAt,
+    })
+    .from(uploads)
+    .where(eq(uploads.assessmentId, assessmentId))
+    .orderBy(asc(uploads.createdAt));
+
+  return { assessment, responses, uploads: assessmentUploads };
+}
+
+export async function getSubmissionCountByTemplate(templateId: string) {
+  await requireActiveAdmin();
+
+  const [result] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(assessments)
+    .where(eq(assessments.templateId, templateId));
+
+  return result.count;
+}
+
+export async function listPublishedTemplatesForFilter() {
+  await requireActiveAdmin();
+
+  return db
+    .select({
+      id: assessmentTemplates.id,
+      name: assessmentTemplates.name,
+    })
+    .from(assessmentTemplates)
+    .orderBy(asc(assessmentTemplates.name));
 }

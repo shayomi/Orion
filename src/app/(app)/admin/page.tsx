@@ -1,33 +1,10 @@
 import Link from "next/link";
 import { Topbar } from "@/components/layout/topbar";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { requireActiveAdmin } from "@/lib/admin";
-import { getTemplateStatusCounts, getRecentAdminAuditEvents } from "@/app/actions/admin";
-import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { sql } from "drizzle-orm";
+import { getTemplateStatusCounts, getRecentAdminAuditEvents, getAdminUserStats } from "@/app/actions/admin";
 
-async function getUserStats() {
-  const rows = await db
-    .select({
-      role: users.role,
-      status: users.status,
-      count: sql<number>`count(*)::int`,
-    })
-    .from(users)
-    .groupBy(users.role, users.status);
-
-  const stats = { total: 0, active: 0, suspended: 0, admins: 0, members: 0 };
-  for (const row of rows) {
-    stats.total += row.count;
-    if (row.status === "active") stats.active += row.count;
-    if (row.status === "suspended") stats.suspended += row.count;
-    if (row.role === "admin") stats.admins += row.count;
-    if (row.role === "member") stats.members += row.count;
-  }
-  return stats;
-}
+export const dynamic = "force-dynamic";
 
 function formatDate(value: Date | string | null) {
   if (!value) return "-";
@@ -47,7 +24,7 @@ export default async function AdminDashboardPage() {
   const admin = await requireActiveAdmin();
 
   const [userStats, templateCounts, recentAudit] = await Promise.all([
-    getUserStats(),
+    getAdminUserStats(),
     getTemplateStatusCounts(),
     getRecentAdminAuditEvents(10),
   ]);
@@ -60,79 +37,67 @@ export default async function AdminDashboardPage() {
       />
       <div className="space-y-6 p-6">
         {/* Quick stats */}
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
           <Link href="/admin/users">
-            <Card className="hover:border-indigo-200 transition-colors cursor-pointer">
-              <CardHeader>
-                <CardDescription>Total users</CardDescription>
-                <CardTitle>{userStats.total}</CardTitle>
-              </CardHeader>
-            </Card>
+            <div className="bg-white rounded-xl p-5 hover:bg-gray-50/50 transition-colors cursor-pointer">
+              <p className="text-sm text-gray-400">Total users</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{userStats.total}</p>
+            </div>
           </Link>
           <Link href="/admin/users?q=admin">
-            <Card className="hover:border-indigo-200 transition-colors cursor-pointer">
-              <CardHeader>
-                <CardDescription>Admins</CardDescription>
-                <CardTitle>{userStats.admins}</CardTitle>
-              </CardHeader>
-            </Card>
+            <div className="bg-white rounded-xl p-5 hover:bg-gray-50/50 transition-colors cursor-pointer">
+              <p className="text-sm text-gray-400">Admins</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{userStats.admins}</p>
+            </div>
           </Link>
           <Link href="/admin/assessments">
-            <Card className="hover:border-indigo-200 transition-colors cursor-pointer">
-              <CardHeader>
-                <CardDescription>Published templates</CardDescription>
-                <CardTitle>{templateCounts.published}</CardTitle>
-              </CardHeader>
-            </Card>
+            <div className="bg-white rounded-xl p-5 hover:bg-gray-50/50 transition-colors cursor-pointer">
+              <p className="text-sm text-gray-400">Published templates</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{templateCounts.published}</p>
+            </div>
           </Link>
           <Link href="/admin/assessments?q=draft">
-            <Card className="hover:border-indigo-200 transition-colors cursor-pointer">
-              <CardHeader>
-                <CardDescription>Draft templates</CardDescription>
-                <CardTitle>{templateCounts.draft}</CardTitle>
-              </CardHeader>
-            </Card>
+            <div className="bg-white rounded-xl p-5 hover:bg-gray-50/50 transition-colors cursor-pointer">
+              <p className="text-sm text-gray-400">Draft templates</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{templateCounts.draft}</p>
+            </div>
           </Link>
         </div>
 
         {/* Quick links */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Link href="/admin/users">
-            <Card className="hover:border-indigo-200 transition-colors cursor-pointer h-full">
-              <CardHeader>
-                <CardTitle className="text-base">User Management</CardTitle>
-                <CardDescription>
-                  {userStats.active} active, {userStats.suspended} suspended
-                </CardDescription>
-              </CardHeader>
-            </Card>
+            <div className="bg-white rounded-xl p-5 hover:bg-gray-50/50 transition-colors cursor-pointer h-full">
+              <p className="text-base font-semibold text-gray-900">User Management</p>
+              <p className="text-sm text-gray-400 mt-1">
+                {userStats.active} active, {userStats.suspended} suspended
+              </p>
+            </div>
           </Link>
           <Link href="/admin/assessments">
-            <Card className="hover:border-indigo-200 transition-colors cursor-pointer h-full">
-              <CardHeader>
-                <CardTitle className="text-base">Assessment Templates</CardTitle>
-                <CardDescription>
-                  {templateCounts.published} published, {templateCounts.draft}{" "}
-                  drafts, {templateCounts.archived} archived
-                </CardDescription>
-              </CardHeader>
-            </Card>
+            <div className="bg-white rounded-xl p-5 hover:bg-gray-50/50 transition-colors cursor-pointer h-full">
+              <p className="text-base font-semibold text-gray-900">Assessment Templates</p>
+              <p className="text-sm text-gray-400 mt-1">
+                {templateCounts.published} published, {templateCounts.draft}{" "}
+                drafts, {templateCounts.archived} archived
+              </p>
+            </div>
           </Link>
         </div>
 
         {/* Recent audit log */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent admin activity</CardTitle>
-            <CardDescription>Last 10 admin actions</CardDescription>
-          </CardHeader>
+        <div className="bg-white rounded-xl">
+          <div className="px-6 pt-6 pb-2">
+            <h2 className="text-base font-semibold text-gray-900">Recent admin activity</h2>
+            <p className="text-sm text-gray-400 mt-0.5">Last 10 admin actions</p>
+          </div>
           <div className="px-6 pb-6">
             {recentAudit.length === 0 ? (
-              <p className="text-sm text-gray-500">No admin activity yet.</p>
+              <p className="text-sm text-gray-400">No admin activity yet.</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-gray-100">
-                <table className="min-w-full divide-y divide-gray-100 text-sm">
-                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+              <div className="overflow-x-auto rounded-xl">
+                <table className="min-w-full divide-y divide-gray-100/60 text-sm">
+                  <thead className="bg-gray-50/30 text-left text-xs uppercase tracking-wide text-gray-400">
                     <tr>
                       <th className="px-4 py-3 font-medium">Action</th>
                       <th className="px-4 py-3 font-medium">Entity</th>
@@ -140,7 +105,7 @@ export default async function AdminDashboardPage() {
                       <th className="px-4 py-3 font-medium">When</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
+                  <tbody className="divide-y divide-gray-50/60">
                     {recentAudit.map((event) => (
                       <tr key={event.id}>
                         <td className="px-4 py-3 text-gray-900">
@@ -149,10 +114,10 @@ export default async function AdminDashboardPage() {
                         <td className="px-4 py-3">
                           <Badge variant="outline">{event.entityType}</Badge>
                         </td>
-                        <td className="px-4 py-3 text-gray-600">
+                        <td className="px-4 py-3 text-gray-500">
                           {event.actorEmail || "System"}
                         </td>
-                        <td className="px-4 py-3 text-gray-500 text-xs">
+                        <td className="px-4 py-3 text-gray-400 text-xs">
                           {formatDate(event.createdAt)}
                         </td>
                       </tr>
@@ -162,7 +127,7 @@ export default async function AdminDashboardPage() {
               </div>
             )}
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );

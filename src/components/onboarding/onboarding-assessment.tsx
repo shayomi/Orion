@@ -1,189 +1,31 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   ChevronRight,
   ChevronLeft,
-  CheckCircle2,
   Sparkles,
   Loader2,
 } from "lucide-react";
+import {
+  type Section,
+  type Question,
+  type Answers,
+  shouldShow,
+  QuestionCard,
+} from "@/components/assessment/question-field";
+import { SectionNav } from "@/components/assessment/section-nav";
 
 // ─── Types ──────────────────────────────────────────────
-
-interface Section {
-  id: string;
-  title: string;
-  description: string | null;
-  orderIndex: number;
-}
-
-interface Question {
-  id: string;
-  sectionId: string;
-  questionKey: string;
-  prompt: string;
-  description: string | null;
-  inputType: string;
-  options: Record<string, unknown> | null;
-  domain: string | null;
-  required: boolean;
-  weight: number;
-  orderIndex: number;
-}
 
 interface OnboardingAssessmentProps {
   template: { id: string; name: string; description: string | null };
   sections: Section[];
   questions: Question[];
-}
-
-type Answers = Record<string, string | string[]>;
-
-// ─── Helpers ────────────────────────────────────────────
-
-const inputClass =
-  "w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 placeholder:text-gray-400";
-
-function getChoices(options: Record<string, unknown> | null): string[] {
-  if (!options) return [];
-  if (Array.isArray(options.choices)) return options.choices as string[];
-  return [];
-}
-
-function getShowIf(
-  options: Record<string, unknown> | null
-): { questionKey: string; equals?: string; notEquals?: string; includes?: string } | null {
-  if (!options || !options.showIf) return null;
-  return options.showIf as { questionKey: string; equals?: string; notEquals?: string; includes?: string };
-}
-
-function shouldShow(question: Question, answers: Answers): boolean {
-  const showIf = getShowIf(question.options);
-  if (!showIf) return true;
-
-  const val = answers[showIf.questionKey];
-  if (showIf.equals) {
-    if (Array.isArray(val)) return val.includes(showIf.equals);
-    return val === showIf.equals;
-  }
-  if (showIf.notEquals) {
-    if (Array.isArray(val)) return !val.includes(showIf.notEquals);
-    return val !== showIf.notEquals;
-  }
-  if (showIf.includes) {
-    if (Array.isArray(val)) return val.includes(showIf.includes);
-    return val === showIf.includes;
-  }
-  return true;
-}
-
-// ─── Question field ─────────────────────────────────────
-
-function QuestionField({
-  question,
-  value,
-  onChange,
-}: {
-  question: Question;
-  value: string | string[] | undefined;
-  onChange: (key: string, val: string | string[]) => void;
-}) {
-  const choices = getChoices(question.options);
-
-  if (question.inputType === "select" && choices.length > 0) {
-    return (
-      <div className="space-y-2">
-        {choices.map((choice) => {
-          const selected = value === choice;
-          return (
-            <button
-              key={choice}
-              type="button"
-              onClick={() => onChange(question.questionKey, choice)}
-              className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-all ${
-                selected
-                  ? "border-indigo-500 bg-indigo-50 text-indigo-700 font-medium"
-                  : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
-              }`}
-            >
-              {choice}
-            </button>
-          );
-        })}
-      </div>
-    );
-  }
-
-  if (question.inputType === "multi_select" && choices.length > 0) {
-    const selected = Array.isArray(value) ? value : [];
-    return (
-      <div className="space-y-2">
-        {choices.map((choice) => {
-          const isSelected = selected.includes(choice);
-          return (
-            <button
-              key={choice}
-              type="button"
-              onClick={() => {
-                const next = isSelected
-                  ? selected.filter((c) => c !== choice)
-                  : [...selected, choice];
-                onChange(question.questionKey, next);
-              }}
-              className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-all flex items-center gap-3 ${
-                isSelected
-                  ? "border-indigo-500 bg-indigo-50"
-                  : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-              }`}
-            >
-              <div
-                className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
-                  isSelected
-                    ? "bg-indigo-600 border-indigo-600"
-                    : "border-gray-300"
-                }`}
-              >
-                {isSelected && (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                )}
-              </div>
-              <span className={isSelected ? "text-indigo-700 font-medium" : "text-gray-600"}>
-                {choice}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    );
-  }
-
-  if (question.inputType === "textarea") {
-    return (
-      <textarea
-        value={typeof value === "string" ? value : ""}
-        onChange={(e) => onChange(question.questionKey, e.target.value)}
-        rows={4}
-        placeholder="Enter your response..."
-        className={inputClass}
-      />
-    );
-  }
-
-  return (
-    <input
-      type="text"
-      value={typeof value === "string" ? value : ""}
-      onChange={(e) => onChange(question.questionKey, e.target.value)}
-      placeholder="Enter your response..."
-      className={inputClass}
-    />
-  );
 }
 
 // ─── Main component ─────────────────────────────────────
@@ -198,6 +40,21 @@ export function OnboardingAssessment({
   const [answers, setAnswers] = useState<Answers>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [assessmentId, setAssessmentId] = useState<string | undefined>();
+
+  // Start or resume an in-progress assessment
+  useEffect(() => {
+    fetch("/api/assessments/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ templateId: template.id }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.assessmentId) setAssessmentId(data.assessmentId);
+      })
+      .catch(() => {});
+  }, [template.id]);
 
   const questionsBySection = useMemo(() => {
     const map = new Map<string, Question[]>();
@@ -221,6 +78,8 @@ export function OnboardingAssessment({
     .filter((q) => q.required)
     .every((q) => {
       const val = answers[q.questionKey];
+      const fileVal = answers[`${q.questionKey}__file`];
+      if (fileVal) return true;
       if (Array.isArray(val)) return val.length > 0;
       return !!val;
     });
@@ -233,6 +92,8 @@ export function OnboardingAssessment({
   const allVisibleQuestions = questions.filter((q) => shouldShow(q, answers));
   const answeredCount = allVisibleQuestions.filter((q) => {
     const val = answers[q.questionKey];
+    const fileVal = answers[`${q.questionKey}__file`];
+    if (fileVal) return true;
     if (Array.isArray(val)) return val.length > 0;
     return !!val;
   }).length;
@@ -249,6 +110,11 @@ export function OnboardingAssessment({
       setCurrentSectionIdx((i) => i - 1);
       window.scrollTo(0, 0);
     }
+  };
+
+  const handleNavigate = (idx: number) => {
+    setCurrentSectionIdx(idx);
+    window.scrollTo(0, 0);
   };
 
   const handleSubmit = async () => {
@@ -274,11 +140,7 @@ export function OnboardingAssessment({
       const persistRes = await fetch("/api/onboarding/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          templateId: template.id,
-          answers,
-          result,
-        }),
+        body: JSON.stringify({ templateId: template.id, answers, result }),
       });
 
       if (!persistRes.ok) {
@@ -294,7 +156,8 @@ export function OnboardingAssessment({
     }
   };
 
-  // Submitting state
+  // ─── Submitting state ───────────────────────────────
+
   if (submitting) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex items-center justify-center px-4">
@@ -324,7 +187,7 @@ export function OnboardingAssessment({
     <div className="min-h-screen bg-[#fafafa]">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-100">
-        <div className="max-w-2xl mx-auto px-6 py-4">
+        <div className="max-w-4xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
@@ -350,52 +213,44 @@ export function OnboardingAssessment({
         </div>
       </div>
 
-      {/* Section content */}
-      <div className="max-w-2xl mx-auto px-6 pb-32">
-        <Card className="mt-6">
-          <div className="p-6">
+      {/* Content with section nav */}
+      <div className="max-w-4xl mx-auto px-6 pb-32">
+        <div className="flex gap-8 mt-6">
+          <SectionNav
+            sections={sections}
+            questions={questions}
+            answers={answers}
+            currentIndex={currentSectionIdx}
+            onNavigate={handleNavigate}
+          />
+
+          <div className="flex-1 min-w-0">
+            {/* Section header */}
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-gray-900">
                 {currentSection.title}
               </h2>
               {currentSection.description && (
-                <p className="text-sm text-gray-500 mt-1">
-                  {currentSection.description}
-                </p>
+                <div className="mt-2 pl-4 border-l-2 border-indigo-200">
+                  <p className="text-sm text-gray-500 leading-relaxed">
+                    {currentSection.description}
+                  </p>
+                </div>
               )}
             </div>
 
-            <div className="space-y-8">
+            {/* Questions */}
+            <div className="space-y-5">
               {visibleQuestions.map((question, qi) => (
-                <div key={question.id}>
-                  <div className="mb-3">
-                    <div className="flex items-start gap-2">
-                      <span className="text-xs font-medium text-gray-400 mt-0.5 shrink-0">
-                        {qi + 1}.
-                      </span>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {question.prompt}
-                          {question.required && (
-                            <span className="text-red-400 ml-1">*</span>
-                          )}
-                        </p>
-                        {question.description && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            {question.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="ml-5">
-                    <QuestionField
-                      question={question}
-                      value={answers[question.questionKey]}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
+                <QuestionCard
+                  key={question.id}
+                  question={question}
+                  index={qi + 1}
+                  value={answers[question.questionKey]}
+                  onChange={handleChange}
+                  assessmentId={assessmentId}
+                  attachmentValue={answers[`${question.questionKey}__file`]}
+                />
               ))}
             </div>
 
@@ -405,12 +260,12 @@ export function OnboardingAssessment({
               </div>
             )}
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* Footer nav */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-100">
-        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <Button
             variant="ghost"
             onClick={handleBack}

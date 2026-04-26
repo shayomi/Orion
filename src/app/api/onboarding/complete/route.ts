@@ -4,6 +4,7 @@ import {
   startups,
   assessments,
   assessmentResponses,
+  assessmentAnswers,
   legalIssues,
   recommendations,
 } from "@/lib/db/schema";
@@ -56,6 +57,14 @@ export async function POST(req: Request) {
       completedAt: new Date(),
     })
     .returning();
+
+  // Store raw answers + AI analysis side-by-side
+  await db.insert(assessmentAnswers).values({
+    userId,
+    assessmentId: assessment.id,
+    rawAnswers: answers,
+    aiAnalysis: result,
+  });
 
   // Store all answers as assessment responses
   const responseEntries = Object.entries(answers).map(([key, value]) => ({

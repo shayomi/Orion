@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, ArrowRight, Plus } from "lucide-react";
+import { FileText, ArrowRight, Plus, Upload, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface RecentDoc {
@@ -9,6 +9,7 @@ interface RecentDoc {
   name: string;
   type: string;
   status: string;
+  source?: "generated" | "uploaded";
   createdAt: Date;
 }
 
@@ -57,8 +58,14 @@ export default function RecentDocuments({ docs }: { docs: RecentDoc[] }) {
                   href="/dashboard/documents"
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group"
                 >
-                  <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-4 h-4 text-indigo-500" />
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    doc.source === "uploaded" ? "bg-emerald-50" : "bg-indigo-50"
+                  }`}>
+                    {doc.source === "uploaded" ? (
+                      <Upload className="w-4 h-4 text-emerald-500" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 text-indigo-500" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
@@ -68,7 +75,9 @@ export default function RecentDocuments({ docs }: { docs: RecentDoc[] }) {
                       {doc.type} · {new Date(doc.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <Badge variant={status.variant}>{status.label}</Badge>
+                  <Badge variant={doc.source === "uploaded" ? "success" : "info"}>
+                    {doc.source === "uploaded" ? "Uploaded" : "Generated"}
+                  </Badge>
                 </Link>
               );
             })}

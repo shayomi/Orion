@@ -4,10 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CheckCircle2, ArrowRight } from "lucide-react";
-import { mockWorkflows } from "@/lib/mock-data";
+import { PLACEHOLDER_WORKFLOWS } from "@/lib/data/workflows";
 
 export default function ActiveWorkflowCard() {
-  const activeWorkflow = mockWorkflows.find((w) => w.status === "in_progress");
+  const activeWorkflow = PLACEHOLDER_WORKFLOWS.find((w) => w.status === "in_progress");
   const currentStep = activeWorkflow?.steps.find((s) => s.status === "in_progress");
 
   return (

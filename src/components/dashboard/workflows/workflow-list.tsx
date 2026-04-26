@@ -14,7 +14,7 @@ import {
   ArrowRight,
   Play,
 } from "lucide-react";
-import { mockWorkflows } from "@/lib/mock-data";
+import { PLACEHOLDER_WORKFLOWS } from "@/lib/data/workflows";
 import { cn } from "@/lib/utils";
 
 export default function WorkflowList() {
@@ -23,11 +23,11 @@ export default function WorkflowList() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        {mockWorkflows.filter((w) => w.status !== "locked").length} workflows available ·{" "}
-        {mockWorkflows.filter((w) => w.status === "in_progress").length} in progress
+        {PLACEHOLDER_WORKFLOWS.filter((w) => w.status !== "locked").length} workflows available ·{" "}
+        {PLACEHOLDER_WORKFLOWS.filter((w) => w.status === "in_progress").length} in progress
       </p>
 
-      {mockWorkflows.map((workflow) => {
+      {PLACEHOLDER_WORKFLOWS.map((workflow) => {
         const isExpanded = expanded === workflow.id;
         const isLocked = workflow.status === "locked";
 

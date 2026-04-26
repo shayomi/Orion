@@ -5,7 +5,6 @@ import {
 } from "@/app/actions/admin";
 import { Topbar } from "@/components/layout/topbar";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/admin/pagination";
 import { UserRowActions } from "@/components/admin/user-row-actions";
@@ -19,7 +18,7 @@ type UsersPageProps = {
 };
 
 const inputClass =
-  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50";
+  "w-full rounded-lg bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-indigo-100 transition-colors";
 
 function formatDate(value: Date | string) {
   const date = value instanceof Date ? value : new Date(value);
@@ -45,38 +44,30 @@ export default async function AdminUsersPage({ searchParams }: UsersPageProps) {
       <Topbar title="User Management" subtitle="Review and manage platform access" />
       <div className="space-y-6 p-6">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Card>
-            <CardHeader>
-              <CardDescription>Total users</CardDescription>
-              <CardTitle>{total}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>Active (page)</CardDescription>
-              <CardTitle>{activeCount}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>Suspended (page)</CardDescription>
-              <CardTitle>{suspendedCount}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>Admins (page)</CardDescription>
-              <CardTitle>{adminCount}</CardTitle>
-            </CardHeader>
-          </Card>
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-sm text-gray-400">Total users</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{total}</p>
+          </div>
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-sm text-gray-400">Active (page)</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{activeCount}</p>
+          </div>
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-sm text-gray-400">Suspended (page)</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{suspendedCount}</p>
+          </div>
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-sm text-gray-400">Admins (page)</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{adminCount}</p>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Directory</CardTitle>
-            <CardDescription>Search by name, email, role, or status</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="bg-white rounded-xl">
+          <div className="px-6 pt-6 pb-2">
+            <h2 className="text-base font-semibold text-gray-900">Directory</h2>
+            <p className="text-sm text-gray-400 mt-0.5">Search by name, email, role, or status</p>
+          </div>
+          <div className="px-6 pb-6 space-y-4">
             <form method="get" className="flex flex-col gap-3 sm:flex-row">
               <input
                 name="q"
@@ -89,9 +80,9 @@ export default async function AdminUsersPage({ searchParams }: UsersPageProps) {
               </Button>
             </form>
 
-            <div className="overflow-x-auto rounded-xl border border-gray-100">
-              <table className="min-w-full divide-y divide-gray-100 text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+            <div className="overflow-x-auto rounded-xl">
+              <table className="min-w-full divide-y divide-gray-100/60 text-sm">
+                <thead className="bg-gray-50/30 text-left text-xs uppercase tracking-wide text-gray-400">
                   <tr>
                     <th className="px-4 py-3 font-medium">User</th>
                     <th className="px-4 py-3 font-medium">Role</th>
@@ -100,14 +91,14 @@ export default async function AdminUsersPage({ searchParams }: UsersPageProps) {
                     <th className="px-4 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="divide-y divide-gray-50/60">
                   {users.map((user) => (
                     <tr key={user.id}>
                       <td className="px-4 py-3 align-top">
                         <p className="font-medium text-gray-900">
                           {user.name || "Unnamed user"}
                         </p>
-                        <p className="text-xs text-gray-500">{user.email}</p>
+                        <p className="text-xs text-gray-400">{user.email}</p>
                       </td>
                       <td className="px-4 py-3 align-top">
                         <Badge variant={user.role === "admin" ? "info" : "default"}>
@@ -119,7 +110,7 @@ export default async function AdminUsersPage({ searchParams }: UsersPageProps) {
                           {user.status}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 align-top text-gray-600">
+                      <td className="px-4 py-3 align-top text-gray-500">
                         {formatDate(user.createdAt)}
                       </td>
                       <td className="px-4 py-3 align-top">
@@ -144,8 +135,8 @@ export default async function AdminUsersPage({ searchParams }: UsersPageProps) {
               basePath="/admin/users"
               searchParams={{ q: search || undefined }}
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { documents } from "@/lib/db/schema";
+import { documents, uploads } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 
 export async function GET() {
@@ -9,7 +9,8 @@ export async function GET() {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const docs = await db
+  // Fetch AI-generated documents
+  const generatedDocs = await db
     .select({
       id: documents.id,
       name: documents.name,
@@ -22,5 +23,41 @@ export async function GET() {
     .where(eq(documents.userId, session.user.id))
     .orderBy(desc(documents.createdAt));
 
-  return Response.json(docs);
+  // Fetch user-uploaded files
+  const uploadedDocs = await db
+    .select({
+      id: uploads.id,
+      name: uploads.name,
+      mimeType: uploads.mimeType,
+      storageKey: uploads.storageKey,
+      domain: uploads.domain,
+      createdAt: uploads.createdAt,
+    })
+    .from(uploads)
+    .where(eq(uploads.userId, session.user.id))
+    .orderBy(desc(uploads.createdAt));
+
+  // Merge with source tags
+  const merged = [
+    ...generatedDocs.map((d) => ({
+      id: d.id,
+      name: d.name,
+      type: d.type,
+      status: d.status,
+      content: d.content,
+      source: "generated" as const,
+      createdAt: d.createdAt,
+    })),
+    ...uploadedDocs.map((u) => ({
+      id: u.id,
+      name: u.name,
+      type: u.domain || "upload",
+      status: "ready" as const,
+      content: null,
+      source: "uploaded" as const,
+      createdAt: u.createdAt,
+    })),
+  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  return Response.json(merged);
 }

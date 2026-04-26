@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, MessageSquare } from "lucide-react";
-import { mockServices } from "@/lib/mock-data";
+import { SERVICES } from "@/lib/data/services";
 
 export default function ServicePackages() {
   return (
@@ -15,8 +15,8 @@ export default function ServicePackages() {
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-5">
-          {mockServices.map((service) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {SERVICES.map((service) => (
             <Card
               key={service.id}
               className={`relative ${service.popular ? "border-indigo-300 shadow-md" : ""}`}

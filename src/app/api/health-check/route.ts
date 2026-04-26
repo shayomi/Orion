@@ -1,8 +1,14 @@
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   assessmentTemplates,
   assessmentTemplateSections,
   assessmentTemplateQuestions,
+  startups,
+  assessments,
+  assessmentAnswers,
+  legalIssues,
+  recommendations,
 } from "@/lib/db/schema";
 import { eq, inArray, asc } from "drizzle-orm";
 import OpenAI from "openai";
@@ -21,6 +27,10 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+
+  // Check auth — persist to DB if authenticated, otherwise guest flow
+  const session = await auth();
+  const userId = session?.user?.id;
 
   // Fetch template, sections, and questions from DB
   const [template] = await db
@@ -193,6 +203,91 @@ Return ONLY the JSON object. No markdown, no code fences, no commentary.`;
     answeredQuestions: Object.keys(answers).length,
     totalQuestions: questions.length,
   };
+
+  // Persist to DB for authenticated users
+  if (userId) {
+    try {
+      // Get or create startup
+      let [startup] = await db
+        .select()
+        .from(startups)
+        .where(eq(startups.userId, userId))
+        .limit(1);
+
+      if (!startup) {
+        [startup] = await db
+          .insert(startups)
+          .values({
+            userId,
+            name: "My Startup",
+            riskScore: assessment.overallScore ?? null,
+          })
+          .returning();
+      } else {
+        await db
+          .update(startups)
+          .set({ riskScore: assessment.overallScore, updatedAt: new Date() })
+          .where(eq(startups.id, startup.id));
+      }
+
+      // Create assessment record
+      const [assessmentRecord] = await db
+        .insert(assessments)
+        .values({
+          startupId: startup.id,
+          templateId,
+          status: "completed",
+          overallScore: assessment.overallScore,
+          riskLevel: assessment.riskLevel,
+          completedAt: new Date(),
+        })
+        .returning();
+
+      // Store raw answers + AI analysis side-by-side
+      await db.insert(assessmentAnswers).values({
+        userId,
+        assessmentId: assessmentRecord.id,
+        rawAnswers: answers,
+        aiAnalysis: assessment,
+      });
+
+      // Insert legal issues + recommendations
+      for (const issue of assessment.issues ?? []) {
+        const [dbIssue] = await db
+          .insert(legalIssues)
+          .values({
+            assessmentId: assessmentRecord.id,
+            startupId: startup.id,
+            title: issue.title,
+            description: issue.description,
+            domain: issue.domain,
+            severity: issue.severity,
+            resolutionPath: issue.resolutionPath,
+          })
+          .returning();
+
+        if (issue.recommendation) {
+          await db.insert(recommendations).values({
+            issueId: dbIssue.id,
+            title: issue.recommendation.title,
+            description: issue.recommendation.description,
+            actionType: issue.resolutionPath,
+            priority:
+              issue.severity === "critical"
+                ? 0
+                : issue.severity === "high"
+                  ? 1
+                  : 2,
+          });
+        }
+      }
+
+      return Response.json({ ...result, assessmentId: assessmentRecord.id });
+    } catch (dbErr) {
+      // DB persistence failed — still return the result to the client
+      console.error("Failed to persist health check to DB:", dbErr);
+    }
+  }
 
   return Response.json(result);
 }

@@ -6,15 +6,9 @@ import {
 import { Topbar } from "@/components/layout/topbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Pagination } from "@/components/admin/pagination";
 import { TemplateListActions } from "@/components/admin/template-list-actions";
+import { TemplateRowActions } from "@/components/admin/template-row-actions";
 import { requireActiveAdmin } from "@/lib/admin";
 
 type AssessmentsPageProps = {
@@ -25,7 +19,7 @@ type AssessmentsPageProps = {
 };
 
 const inputClass =
-  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50";
+  "w-full rounded-lg bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-indigo-100 transition-colors";
 
 function formatDate(value: Date | string | null) {
   if (!value) return "-";
@@ -63,40 +57,32 @@ export default async function AdminAssessmentsPage({
       />
       <div className="space-y-6 p-6">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Card>
-            <CardHeader>
-              <CardDescription>Total templates</CardDescription>
-              <CardTitle>{total}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>Draft</CardDescription>
-              <CardTitle>{statusCounts.draft}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>Published</CardDescription>
-              <CardTitle>{statusCounts.published}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>Archived</CardDescription>
-              <CardTitle>{statusCounts.archived}</CardTitle>
-            </CardHeader>
-          </Card>
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-sm text-gray-400">Total templates</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{total}</p>
+          </div>
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-sm text-gray-400">Draft</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{statusCounts.draft}</p>
+          </div>
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-sm text-gray-400">Published</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{statusCounts.published}</p>
+          </div>
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-sm text-gray-400">Archived</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{statusCounts.archived}</p>
+          </div>
         </div>
 
         <TemplateListActions />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Templates</CardTitle>
-            <CardDescription>Search and manage template lifecycle</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="bg-white rounded-xl">
+          <div className="px-6 pt-6 pb-2">
+            <h2 className="text-base font-semibold text-gray-900">Templates</h2>
+            <p className="text-sm text-gray-400 mt-0.5">Search and manage template lifecycle</p>
+          </div>
+          <div className="px-6 pb-6 space-y-4">
             <form method="get" className="flex flex-col gap-3 sm:flex-row">
               <input
                 name="q"
@@ -109,9 +95,9 @@ export default async function AdminAssessmentsPage({
               </Button>
             </form>
 
-            <div className="overflow-x-auto rounded-xl border border-gray-100">
-              <table className="min-w-full divide-y divide-gray-100 text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+            <div className="overflow-x-auto rounded-xl">
+              <table className="min-w-full divide-y divide-gray-100/60 text-sm">
+                <thead className="bg-gray-50/30 text-left text-xs uppercase tracking-wide text-gray-400">
                   <tr>
                     <th className="px-4 py-3 font-medium">Template</th>
                     <th className="px-4 py-3 font-medium">Status</th>
@@ -121,29 +107,26 @@ export default async function AdminAssessmentsPage({
                     <th className="px-4 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="divide-y divide-gray-50/60">
                   {templates.map((t) => (
                     <tr key={t.id}>
                       <td className="px-4 py-3 align-top">
                         <p className="font-medium text-gray-900">{t.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {t.description || "No description"}
-                        </p>
                       </td>
                       <td className="px-4 py-3 align-top">
                         <Badge variant={statusVariant(t.status)}>
                           {t.status}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 align-top text-gray-600">
+                      <td className="px-4 py-3 align-top text-gray-500">
                         v{t.version}
                       </td>
-                      <td className="px-4 py-3 align-top text-xs text-gray-600">
+                      <td className="px-4 py-3 align-top text-xs text-gray-500">
                         <p>{t.sectionCount} sections</p>
                         <p>{t.questionCount} questions</p>
                         <p>{t.ruleCount} rules</p>
                       </td>
-                      <td className="px-4 py-3 align-top text-gray-600">
+                      <td className="px-4 py-3 align-top text-gray-500">
                         {formatDate(t.updatedAt || t.createdAt)}
                       </td>
                       <td className="px-4 py-3 align-top">
@@ -173,12 +156,9 @@ export default async function AdminAssessmentsPage({
               basePath="/admin/assessments"
               searchParams={{ q: search || undefined }}
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
-
-// Inline server-rendered wrapper that delegates to the client component for each row
-import { TemplateRowActions } from "@/components/admin/template-row-actions";

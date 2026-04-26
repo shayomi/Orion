@@ -1,7 +1,9 @@
-import { getAssessmentTemplateDetail } from "@/app/actions/admin";
+import {
+  getAssessmentTemplateDetail,
+  getSubmissionCountByTemplate,
+} from "@/app/actions/admin";
 import { Topbar } from "@/components/layout/topbar";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireActiveAdmin } from "@/lib/admin";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -32,7 +34,10 @@ export default async function AssessmentTemplateDetailPage({
   await requireActiveAdmin();
 
   const { templateId } = await params;
-  const detail = await getAssessmentTemplateDetail(templateId);
+  const [detail, submissionCount] = await Promise.all([
+    getAssessmentTemplateDetail(templateId),
+    getSubmissionCountByTemplate(templateId),
+  ]);
 
   if (!detail) {
     notFound();
@@ -40,7 +45,6 @@ export default async function AssessmentTemplateDetailPage({
 
   const { template, sections, questions, rules } = detail;
 
-  // Serialize dates for client components
   const serializedTemplate = {
     ...template,
     publishedAt: template.publishedAt?.toISOString() ?? null,
@@ -77,42 +81,42 @@ export default async function AssessmentTemplateDetailPage({
           >
             &larr; Back to templates
           </Link>
-          <div className="text-xs text-gray-500">
-            Created {formatDate(template.createdAt)}
+          <div className="flex items-center gap-4">
+            <Link
+              href={`/admin/assessments/submissions?templateId=${template.id}`}
+              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+            >
+              View Submissions ({submissionCount})
+            </Link>
+            <span className="text-xs text-gray-400">
+              Created {formatDate(template.createdAt)}
+            </span>
           </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Card>
-            <CardHeader>
-              <CardDescription>Status</CardDescription>
-              <CardTitle>
-                <Badge variant={statusVariant(template.status)}>
-                  {template.status}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>Version</CardDescription>
-              <CardTitle>v{template.version}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>Sections</CardDescription>
-              <CardTitle>{sections.length}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>Questions / Rules</CardDescription>
-              <CardTitle>
-                {questions.length} / {rules.length}
-              </CardTitle>
-            </CardHeader>
-          </Card>
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-sm text-gray-400">Status</p>
+            <div className="mt-1">
+              <Badge variant={statusVariant(template.status)}>
+                {template.status}
+              </Badge>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-sm text-gray-400">Version</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">v{template.version}</p>
+          </div>
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-sm text-gray-400">Sections</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{sections.length}</p>
+          </div>
+          <div className="bg-white rounded-xl p-5">
+            <p className="text-sm text-gray-400">Questions / Rules</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">
+              {questions.length} / {rules.length}
+            </p>
+          </div>
         </div>
 
         <TemplateSettingsForm template={serializedTemplate} />
