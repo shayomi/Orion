@@ -88,7 +88,13 @@ export async function POST(req: Request) {
       const val = answers[q.questionKey];
       const displayVal = Array.isArray(val) ? val.join(", ") : val;
       briefSections += `Q: ${q.prompt}\n`;
-      briefSections += `A: ${displayVal}\n\n`;
+      briefSections += `A: ${displayVal}\n`;
+
+      const followUp = answers[`${q.questionKey}__followup`];
+      if (followUp && typeof followUp === "string") {
+        briefSections += `Additional details: ${followUp}\n`;
+      }
+      briefSections += `\n`;
     }
   }
 

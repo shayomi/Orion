@@ -102,6 +102,48 @@ function shouldShowAttachment(question: Question, answers: Answers): boolean {
   return true;
 }
 
+/** Check if a question should show a follow-up text input (e.g. "If yes, specify...") */
+function shouldShowFollowUp(question: Question, answers: Answers): boolean {
+  if (!question.description) return false;
+  const desc = question.description.toLowerCase();
+
+  if (!desc.includes("if yes")) return false;
+
+  // Skip if this is an upload-type follow-up (handled by shouldShowAttachment)
+  const uploadKeywords = ["upload", "attach", "provide supporting doc", "share link"];
+  if (uploadKeywords.some((kw) => desc.includes(kw))) return false;
+
+  // Text follow-up keywords
+  const textKeywords = [
+    "specify", "describe", "explain", "list", "state",
+    "outline", "provide details", "elaborate", "name the",
+    "indicate", "mention",
+  ];
+  if (!textKeywords.some((kw) => desc.includes(kw))) return false;
+
+  // Only show when answer is "Yes"
+  if (question.inputType === "select" && question.options?.choices) {
+    const choices = (question.options.choices as string[]).map((c) => c.toLowerCase());
+    if (choices.includes("yes") && choices.includes("no")) {
+      const val = answers[question.questionKey];
+      const answer = Array.isArray(val) ? val[0] : val;
+      return answer?.toLowerCase() === "yes";
+    }
+  }
+
+  return false;
+}
+
+/** Extract the follow-up prompt from a description like "If yes, specify the number of..." */
+function getFollowUpPrompt(description: string): string {
+  const match = description.match(/if yes[,:]?\s*(.*)/i);
+  if (match?.[1]) {
+    const prompt = match[1].replace(/\.\s*$/, "").trim();
+    return prompt.charAt(0).toUpperCase() + prompt.slice(1);
+  }
+  return "Please provide additional details";
+}
+
 const inputClass =
   "w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 placeholder:text-gray-400 transition-all";
 
@@ -466,6 +508,8 @@ export function QuestionCard({
   answers?: Answers;
 }) {
   const showAttachment = shouldShowAttachment(question, answers) && question.inputType !== "file_upload";
+  const showFollowUp = shouldShowFollowUp(question, answers);
+  const followUpPrompt = showFollowUp && question.description ? getFollowUpPrompt(question.description) : "";
 
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
@@ -505,6 +549,26 @@ export function QuestionCard({
           onChange={onChange}
           assessmentId={assessmentId}
         />
+        {showFollowUp && (
+          <div className="mt-2">
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              {followUpPrompt}
+            </label>
+            <textarea
+              value={
+                typeof answers[`${question.questionKey}__followup`] === "string"
+                  ? (answers[`${question.questionKey}__followup`] as string)
+                  : ""
+              }
+              onChange={(e) =>
+                onChange(`${question.questionKey}__followup`, e.target.value)
+              }
+              placeholder={followUpPrompt}
+              rows={3}
+              className={inputClass}
+            />
+          </div>
+        )}
         {showAttachment && (
           <FileUploadField
             question={question}
